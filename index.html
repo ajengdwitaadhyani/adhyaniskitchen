@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Adhyani's Kitchen - Pre-Order Homemade</title>
+    <!-- Chosen Palette: Warm Peach Neutrals -->
+    <!-- Application Structure Plan: The application is structured as a user-centric conversion funnel. It begins with a 'Hero' section for brand introduction, leading to an 'Interactive Catalog' with filtering for easy product exploration. A 'How to Order' section visually explains the PO process, followed by 'About' and 'Testimonials' to build trust. The user flow culminates in a floating 'Cart Modal', which acts as a centralized checkout point, streamlining the ordering process by submitting data to a backend and preparing a WhatsApp message, thus keeping the user engaged on a single page from discovery to conversion. This structure was chosen to make the pre-order journey intuitive and efficient. -->
+    <!-- Visualization & Content Choices: 
+        - Product Catalog -> Goal: Explore & Select -> Method: Dynamic Grid (JS Fetched) with Buttons (HTML/CSS) -> Interaction: Users can filter products by category. The entire catalog is now dynamically rendered from data fetched from a Google Sheet, making it manageable without code changes.
+        - Order Process -> Goal: Inform & Guide -> Method: 4-Step Visual Diagram (HTML/Tailwind) -> Interaction: Subtle hover animations on each step card. This visually breaks down the process, making it less intimidating and easier to comprehend than a block of text.
+        - Cart Management -> Goal: Consolidate & Convert -> Method: Floating Cart Icon & Modal (HTML/JS) -> Interaction: The cart icon updates with a badge count. The modal dynamically displays selected items, allows quantity changes/deletions, calculates the total, and contains the final submission form.
+        - Data Submission -> Goal: Capture Order & Verify -> Method: Asynchronous Fetch API (JS) -> Interaction: A loading state on the submit button provides feedback. Upon success, it automatically triggers an email confirmation (via Apps Script) and redirects to WhatsApp with a pre-filled template.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" xintegrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        html { scroll-behavior: smooth; }
+        body { font-family: 'Poppins', sans-serif; color: #3a3a3a; background-color: #fffaf7; overflow-x: hidden; }
+        .font-serif { font-family: 'Playfair Display', serif; }
+        .glass-element { background-color: rgba(255, 255, 255, 0.5); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.6); }
+        .card { background-color: rgba(255, 255, 255, 0.7); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.5); transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .card:hover { background-color: rgba(255, 255, 255, 0.9); transform: translateY(-10px) scale(1.02); box-shadow: 0 20px 35px rgba(0, 0, 0, 0.08); }
+        .btn-primary { background-image: linear-gradient(to right, #fe8c00 0%, #f83600 51%, #fe8c00 100%); background-size: 200% auto; color: white; transition: 0.5s; border: none; }
+        .btn-primary:hover { background-position: right center; box-shadow: 0 10px 20px rgba(254, 140, 0, 0.3); }
+        .btn-secondary { background-color: rgba(255, 255, 255, 0.5); border: 1px solid #fe8c00; color: #fe8c00; transition: all 0.3s; }
+        .btn-secondary:hover { background-color: #fe8c00; color: white; }
+        .btn-filter.active { background-color: #fe8c00; color: white; border-color: #fe8c00; }
+        .fade-in { opacity: 0; transform: translateY(25px); transition: opacity 0.7s ease-out, transform 0.7s ease-out; }
+        .fade-in.visible { opacity: 1; transform: translateY(0); }
+        .cart-badge { position: absolute; top: -5px; right: -10px; background-color: #dc2626; color: white; border-radius: 50%; width: 22px; height: 22px; font-size: 13px; display: flex; justify-content: center; align-items: center; font-weight: bold; border: 2px solid white; }
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.5); z-index: 100; display: flex; justify-content: center; align-items: center; opacity: 0; visibility: hidden; transition: opacity 0.3s, visibility 0.3s; }
+        .modal-overlay.show { opacity: 1; visibility: visible; }
+        .modal-content { max-height: 90vh; overflow-y: auto; }
+        .quantity-btn { transition: all 0.2s; }
+        .quantity-btn:hover { background-color: rgba(254, 140, 0, 0.2); }
+        #product-list-loader {
+            display: flex; justify-content: center; align-items: center; min-height: 300px;
+        }
+        /* [PERBAIKAN] Animasi loading baru */
+        .loader-dots { display: flex; justify-content: center; align-items: center; }
+        .loader-dots div { width: 12px; height: 12px; background-color: #f83600; border-radius: 50%; margin: 0 5px; animation: pulse 1.4s infinite ease-in-out both; }
+        .loader-dots .dot1 { animation-delay: -0.32s; }
+        .loader-dots .dot2 { animation-delay: -0.16s; }
+        @keyframes pulse {
+          0%, 80%, 100% { transform: scale(0); }
+          40% { transform: scale(1.0); }
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <header class="glass-element sticky top-0 z-50 shadow-sm">
+        <nav class="container mx-auto px-6 py-4 flex justify-between items-center">
+            <a href="#" class="text-2xl font-serif text-gray-800 flex items-center gap-2"><i class="fa-solid fa-cookie-bite text-[#f83600]"></i> Adhyani's Kitchen</a>
+            <div class="hidden md:flex items-center space-x-8">
+                <a href="#produk" class="text-gray-600 hover:text-gray-900 font-medium">Produk</a>
+                <a href="#cara-pesan" class="text-gray-600 hover:text-gray-900 font-medium">Cara Pesan</a>
+                <a href="#tentang" class="text-gray-600 hover:text-gray-900 font-medium">Tentang Kami</a>
+            </div>
+            <button id="mobile-menu-button" class="md:hidden text-gray-800 text-2xl">☰</button>
+        </nav>
+        <div id="mobile-menu" class="hidden md:hidden glass-element border-t border-white">
+            <a href="#produk" class="block py-3 px-6 text-gray-700 hover:bg-white/50">Produk</a>
+            <a href="#cara-pesan" class="block py-3 px-6 text-gray-700 hover:bg-white/50">Cara Pesan</a>
+            <a href="#tentang" class="block py-3 px-6 text-gray-700 hover:bg-white/50">Tentang Kami</a>
+        </div>
+    </header>
+
+    <main>
+        <section id="home" class="min-h-[90vh] flex items-center bg-gradient-to-br from-[#fffaf7] to-[#ffe8d6]">
+             <div class="container mx-auto px-6 text-center">
+                <div class="max-w-3xl mx-auto">
+                    <div class="fade-in inline-block bg-white/80 rounded-full px-4 py-1 text-sm text-[#f83600] font-semibold mb-4 border border-white">Sistem Pre-Order</div>
+                    <h1 class="text-4xl md:text-6xl font-serif font-bold text-gray-800 mb-4 fade-in" style="transition-delay: 100ms;">Hidangan Spesial, Dibuat Fresh Untuk Anda</h1>
+                    <p class="text-lg text-gray-600 mb-8 fade-in" style="transition-delay: 200ms;">Selamat datang di Adhyani's Kitchen. Kami menyajikan hidangan homemade berkualitas yang dibuat berdasarkan pesanan untuk menjamin kesegaran dan cita rasa terbaik saat tiba di tangan Anda.</p>
+                    <a href="#produk" class="btn-primary rounded-full px-8 py-3 text-lg font-semibold inline-block transform fade-in" style="transition-delay: 400ms;">Lihat Menu & Pesan</a>
+                </div>
+            </div>
+        </section>
+
+        <section id="produk" class="py-20">
+            <div class="container mx-auto px-6">
+                <div class="text-center mb-12">
+                    <h2 class="text-3xl md:text-4xl font-serif text-center mb-4 fade-in">Katalog Produk</h2>
+                    <p class="text-center text-gray-600 max-w-2xl mx-auto fade-in" style="transition-delay: 100ms;">
+                        Jelajahi pilihan menu andalan kami. Pre-Order dibuka setiap Senin-Jumat, dengan pengiriman terjadwal pada hari Sabtu & Minggu untuk memastikan Anda mendapatkan produk yang paling segar.
+                    </p>
+                    <div id="filter-container" class="mt-8 space-x-2 fade-in" style="transition-delay: 200ms;">
+                        <button class="btn-filter btn-secondary active rounded-full px-5 py-2" data-filter="all">Semua</button>
+                    </div>
+                </div>
+                <!-- [PERBAIKAN] Struktur HTML untuk loader baru -->
+                <div id="product-list-loader">
+                    <div class="loader-dots">
+                        <div class="dot1"></div>
+                        <div class="dot2"></div>
+                        <div class="dot3"></div>
+                    </div>
+                </div>
+                <div id="product-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10"></div>
+            </div>
+        </section>
+        
+        <section id="cara-pesan" class="py-20 bg-white/50">
+            <div class="container mx-auto px-6">
+                <h2 class="text-3xl md:text-4xl font-serif text-center mb-12 fade-in">Alur Pemesanan Pre-Order</h2>
+                 <p class="text-center text-gray-600 max-w-3xl mx-auto mb-12 fade-in" style="transition-delay: 100ms;">
+                    Kami merancang proses pemesanan yang sederhana dan transparan agar pengalaman Anda menyenangkan. Ikuti empat langkah mudah di bawah ini untuk menikmati hidangan dari dapur kami.
+                </p>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 text-center">
+                    <div class="fade-in"><div class="card p-6 rounded-xl"><div class="text-5xl text-[#fe8c00] mb-3"><i class="fa-solid fa-clipboard-list"></i></div><h3 class="font-bold text-xl mb-2">1. Pilih Menu</h3><p class="text-gray-600 text-sm">Tentukan jumlah pada produk yang Anda inginkan dan tambahkan ke keranjang.</p></div></div>
+                    <div class="fade-in" style="transition-delay: 200ms;"><div class="card p-6 rounded-xl"><div class="text-5xl text-[#fe8c00] mb-3"><i class="fa-solid fa-pen-to-square"></i></div><h3 class="font-bold text-xl mb-2">2. Isi Data</h3><p class="text-gray-600 text-sm">Buka keranjang, periksa pesanan Anda, lalu isi nama dan email pada kolom yang tersedia.</p></div></div>
+                    <div class="fade-in" style="transition-delay: 400ms;"><div class="card p-6 rounded-xl"><div class="text-5xl text-[#fe8c00] mb-3"><i class="fa-solid fa-paper-plane"></i></div><h3 class="font-bold text-xl mb-2">3. Kirim & Konfirmasi</h3><p class="text-gray-600 text-sm">Klik 'Kirim Pesanan' untuk menyimpan data, menerima email, dan melanjutkan konfirmasi via WhatsApp.</p></div></div>
+                    <div class="fade-in" style="transition-delay: 600ms;"><div class="card p-6 rounded-xl"><div class="text-5xl text-[#fe8c00] mb-3"><i class="fa-solid fa-box-open"></i></div><h3 class="font-bold text-xl mb-2">4. Nikmati Pesanan</h3><p class="text-gray-600 text-sm">Setelah pembayaran, pesanan Anda akan kami siapkan dan kirim sesuai jadwal.</p></div></div>
+                </div>
+            </div>
+        </section>
+
+        <section id="tentang" class="py-20">
+            <div class="container mx-auto px-6">
+                <div class="glass-element rounded-2xl p-8 md:p-12 flex flex-col md:flex-row items-center gap-12">
+                    <div class="md:w-2/5 fade-in">
+                        <img src="https://placehold.co/600x600/ffe8d6/8a5a44?text=Our+Passion" alt="Tentang Adhyani's Kitchen" class="rounded-2xl shadow-xl w-full object-cover">
+                    </div>
+                    <div class="md:w-3/5 text-center md:text-left fade-in" style="transition-delay: 200ms;">
+                        <h2 class="text-3xl md:text-4xl font-serif mb-4">Berawal dari Dapur Rumahan</h2>
+                        <p class="text-gray-600 leading-relaxed mb-6">Adhyani's Kitchen lahir dari hasrat untuk berbagi kebahagiaan melalui cita rasa otentik. Setiap hidangan yang kami sajikan adalah cerminan dari resep warisan keluarga yang diolah dengan bahan-bahan segar pilihan dan sentuhan modern, memastikan setiap gigitan memberikan pengalaman yang tak terlupakan.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+    
+    <footer id="kontak" class="bg-white/50 mt-12 border-t border-gray-200/50">
+        <div class="container mx-auto px-6 py-8 text-center text-gray-700">
+            <h3 class="font-serif text-2xl mb-4">Hubungi Kami</h3>
+            <p class="mb-6">Punya pertanyaan atau permintaan khusus? Kami siap membantu.</p>
+            <div class="flex justify-center space-x-6 mb-8 text-2xl">
+                <a href="https://wa.me/6285819001100" target="_blank" class="text-gray-600 hover:text-[#f83600] transition-colors"><i class="fab fa-whatsapp"></i></a>
+                <a href="mailto:adhyaniskitchen@gmail.com" class="text-gray-600 hover:text-[#f83600] transition-colors"><i class="far fa-envelope"></i></a>
+                <a href="https://www.instagram.com/adhyaniskitchen/" target="_blank" class="text-gray-600 hover:text-[#f83600] transition-colors"><i class="fab fa-instagram"></i></a>
+            </div>
+            <p class="font-medium text-sm">&copy; 2025 Adhyani's Kitchen. All Rights Reserved.</p>
+        </div>
+    </footer>
+    
+    <button id="cart-button" class="fixed bottom-6 right-6 btn-primary rounded-full w-16 h-16 flex items-center justify-center shadow-lg transform hover:scale-110 transition-transform">
+        <i class="fas fa-shopping-cart text-2xl"></i>
+        <span id="cart-badge" class="cart-badge hidden">0</span>
+    </button>
+    
+    <div id="cart-modal" class="modal-overlay">
+        <div class="modal-content glass-element rounded-2xl w-11/12 md:w-2/3 lg:w-1/2 p-6 md:p-8 flex flex-col">
+            <div class="flex justify-between items-center mb-6"><h2 class="text-2xl font-serif">Keranjang Pesanan</h2><button id="close-modal-btn" class="text-3xl text-gray-600 hover:text-gray-900">&times;</button></div>
+            <div id="cart-items" class="mb-6 space-y-4 flex-grow"></div>
+            <div class="border-t border-gray-200 pt-4 mb-6"><div class="flex justify-between items-center font-bold text-lg"><span>Total</span><span id="cart-total">Rp 0</span></div></div>
+            <div class="space-y-4 mb-4">
+                <div><label for="customer-name" class="block mb-2 font-semibold text-gray-700">Nama Pemesan:</label><input type="text" id="customer-name" class="w-full p-3 rounded-lg border border-gray-300/50 bg-white/50 focus:outline-none focus:ring-2 focus:ring-[#fe8c00]" placeholder="Masukkan nama Anda..." required></div>
+                <div><label for="customer-email" class="block mb-2 font-semibold text-gray-700">Email:</label><input type="email" id="customer-email" class="w-full p-3 rounded-lg border border-gray-300/50 bg-white/50 focus:outline-none focus:ring-2 focus:ring-[#fe8c00]" placeholder="Untuk notifikasi pesanan..." required></div>
+                <!-- [PERBAIKAN BARU] Input nomor WhatsApp -->
+                <div>
+                    <label for="customer-whatsapp" class="block mb-2 font-semibold text-gray-700">Nomor WhatsApp Aktif:</label>
+                    <input type="tel" id="customer-whatsapp" class="w-full p-3 rounded-lg border border-gray-300/50 bg-white/50 focus:outline-none focus:ring-2 focus:ring-[#fe8c00]" placeholder="Contoh: 08123456789" required>
+                </div>
+            </div>
+            <button id="submit-order-btn" class="w-full btn-primary rounded-full py-3 text-lg font-semibold flex items-center justify-center disabled:opacity-50"><span id="submit-text">Kirim Pesanan</span><span id="submit-loading" class="hidden"><i class="fas fa-spinner fa-spin mr-2"></i> Mengirim...</span></button>
+        </div>
+    </div>
+    
+    <script type="module">
+        document.addEventListener('DOMContentLoaded', () => {
+            // [PERBAIKAN] Logika untuk mendapatkan URL API yang andal untuk dev dan produksi.
+            // Fungsi ini akan menggunakan variabel VITE dari .env saat pengembangan lokal
+            // dan menggunakan placeholder untuk diganti oleh GitHub Actions saat deployment.
+            const getApiUrl = () => {
+                // Vite mendefinisikan import.meta.env selama 'npm run dev'.
+                // Kita periksa keberadaannya untuk menghindari error di lingkungan produksi (GitHub Pages).
+                if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_GOOGLE_SCRIPT_URL) {
+                    return import.meta.env.VITE_GOOGLE_SCRIPT_URL;
+                }
+                // Ini adalah placeholder yang akan diganti oleh GitHub Actions saat deployment.
+                return '__GOOGLE_SCRIPT_URL__';
+            };
+            const GOOGLE_SCRIPT_URL = getApiUrl();
+
+            // [PERUBAHAN] Mengganti nomor WhatsApp tujuan sesuai permintaan
+            const WHATSAPP_NUMBER = '6285819001100';
+
+            let products = [];
+            let cart = {};
+
+            const productListEl = document.getElementById('product-list');
+            const productListLoader = document.getElementById('product-list-loader');
+            const filterContainer = document.getElementById('filter-container');
+            const cartButton = document.getElementById('cart-button');
+            const cartModal = document.getElementById('cart-modal');
+            const closeModalBtn = document.getElementById('close-modal-btn');
+            const cartItemsContainer = document.getElementById('cart-items');
+            const cartTotalEl = document.getElementById('cart-total');
+            const cartBadge = document.getElementById('cart-badge');
+            const submitOrderBtn = document.getElementById('submit-order-btn');
+            const customerNameInput = document.getElementById('customer-name');
+            const customerEmailInput = document.getElementById('customer-email');
+            const customerWhatsappInput = document.getElementById('customer-whatsapp'); 
+            const mobileMenuButton = document.getElementById('mobile-menu-button');
+            const mobileMenu = document.getElementById('mobile-menu');
+
+            const formatRupiah = (number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(number);
+            
+            const formatWhatsappLink = (number) => {
+                let formatted = number.replace(/\D/g, ''); 
+                if (formatted.startsWith('0')) {
+                    formatted = '62' + formatted.substring(1);
+                } else if (!formatted.startsWith('62')) {
+                    formatted = '62' + formatted;
+                }
+                return `https://wa.me/${formatted}`;
+            };
+ 
+            const fetchProducts = async () => {
+                // [PERBAIKAN] Menambahkan pengecekan jika URL belum diganti
+                if (GOOGLE_SCRIPT_URL === '__GOOGLE_SCRIPT_URL__') {
+                    console.error("GOOGLE_SCRIPT_URL is not set. Make sure it's replaced during the build process.");
+                    productListEl.innerHTML = `<p class="text-center text-red-500 col-span-full">Konfigurasi URL backend belum diatur. Proses build/deployment mungkin gagal.</p>`;
+                    productListLoader.style.display = 'none';
+                    return;
+                }
+
+                try {
+                    const res = await fetch(GOOGLE_SCRIPT_URL);
+                    if (!res.ok) throw new Error(`Network response was not ok. Status: ${res.status}`);
+                    
+                    const data = await res.json();
+
+                    if (!Array.isArray(data)) {
+                        throw new Error("Data yang diterima bukan array. Cek output Apps Script Anda.");
+                    }
+                    
+                    products = data;
+                    
+                    renderProducts();
+                    setupFilters();
+                } catch (error) {
+                    console.error("Error fetching products:", error);
+                    productListEl.innerHTML = `<p class="text-center text-red-500 col-span-full">Gagal memuat produk. Error: ${error.message}. Coba periksa console log untuk detail.</p>`;
+                } finally {
+                    productListLoader.style.display = 'none';
+                }
+            };
+            
+            const setupFilters = () => {
+                const categories = [...new Set(products.map(p => p.category))];
+                categories.forEach(cat => {
+                    const button = document.createElement('button');
+                    button.className = 'btn-filter btn-secondary rounded-full px-5 py-2';
+                    button.dataset.filter = cat;
+                    button.textContent = cat.charAt(0).toUpperCase() + cat.slice(1);
+                    filterContainer.appendChild(button);
+                });
+            };
+
+            const renderProducts = (filter = 'all') => {
+                const filteredProducts = products.filter(p => filter === 'all' || p.category === filter);
+                productListEl.innerHTML = filteredProducts.map((p, index) => `
+                    <div class="card rounded-2xl overflow-hidden flex flex-col fade-in" data-category="${p.category}" style="transition-delay: ${index * 50}ms;">
+                        <div class="overflow-hidden h-56"><img class="w-full h-full object-cover" src="${p.imageUrl}" alt="${p.name}"></div>
+                        <div class="p-5 flex flex-col flex-grow">
+                            <h3 class="font-bold text-lg mb-1">${p.name}</h3>
+                            <p class="text-sm text-gray-600 mb-3">${p.description}</p>
+                            <span class="text-lg font-bold text-gray-800 mb-4">${formatRupiah(p.price)}</span>
+                            <div class="mt-auto flex items-center justify-between gap-4">
+                               <div class="flex items-center gap-3">
+                                   <button class="quantity-btn quantity-change w-8 h-8 rounded-full bg-white/50 text-lg" data-id="${p.id}" data-change="-1">-</button>
+                                   <span id="quantity-${p.id}" class="font-bold text-base w-5 text-center">0</span>
+                                   <button class="quantity-btn quantity-change w-8 h-8 rounded-full bg-white/50 text-lg" data-id="${p.id}" data-change="1">+</button>
+                               </div>
+                               <button class="add-to-cart-btn btn-primary rounded-full px-4 py-2 text-sm font-semibold" data-id="${p.id}">Tambah</button>
+                            </div>
+                        </div>
+                    </div>`).join('');
+                setTimeout(() => document.querySelectorAll('#product-list .fade-in').forEach(el => el.classList.add('visible')), 10);
+            };
+
+            const updateUI = () => {
+                const totalItems = Object.values(cart).reduce((sum, qty) => sum + qty, 0);
+                cartBadge.textContent = totalItems;
+                cartBadge.classList.toggle('hidden', totalItems === 0);
+                updateCartModal();
+            };
+            
+            const updateCartModal = () => {
+                if (Object.keys(cart).length === 0) {
+                    cartItemsContainer.innerHTML = `<div class="text-center py-8"><i class="fa-solid fa-cart-shopping text-4xl text-gray-300"></i><p class="mt-4 text-gray-600">Keranjang Anda kosong.</p></div>`;
+                    cartTotalEl.textContent = formatRupiah(0);
+                    return;
+                }
+                cartItemsContainer.innerHTML = Object.keys(cart).map(id => {
+                    const product = products.find(p => p.id == id);
+                    if (!product) return '';
+                    return `
+                    <div class="flex items-center justify-between gap-4">
+                        <div class="flex-grow">
+                            <p class="font-semibold">${product.name}</p>
+                            <p class="text-sm text-gray-600">${formatRupiah(product.price)}</p>
+                        </div>
+                        <div class="flex items-center gap-3">
+                           <button class="quantity-btn cart-quantity-change w-7 h-7 rounded-full bg-white/50 text-sm" data-id="${id}" data-change="-1">-</button>
+                           <span class="font-bold text-sm w-5 text-center">${cart[id]}</span>
+                           <button class="quantity-btn cart-quantity-change w-7 h-7 rounded-full bg-white/50 text-sm" data-id="${id}" data-change="1">+</button>
+                        </div>
+                        <button class="cart-item-remove text-red-500 hover:text-red-700 text-lg" data-id="${id}"><i class="fa-solid fa-trash-can"></i></button>
+                    </div>`;
+                }).join('');
+                const total = Object.keys(cart).reduce((sum, id) => {
+                    const product = products.find(p => p.id == id);
+                    return sum + ((product ? product.price : 0) * cart[id]);
+                }, 0);
+                cartTotalEl.textContent = formatRupiah(total);
+            };
+
+            const submitOrder = async () => {
+                const customerName = customerNameInput.value.trim();
+                const customerEmail = customerEmailInput.value.trim();
+                const customerWhatsapp = customerWhatsappInput.value.trim(); 
+
+                if (!customerName || !customerEmail || !customerWhatsapp || Object.keys(cart).length === 0) { 
+                    alert('Harap isi nama, email, nomor WhatsApp, dan pastikan keranjang tidak kosong.'); 
+                    return;
+                }
+                if (!/^\S+@\S+\.\S+$/.test(customerEmail)) {
+                    alert('Format email tidak valid.');
+                    return;
+                }
+
+                setLoading(true);
+                const orderId = `AK-${Date.now()}`;
+                const orderData = {
+                    orderId: orderId,
+                    nama: customerName,
+                    email: customerEmail,
+                    whatsapp: formatWhatsappLink(customerWhatsapp), 
+                    items: JSON.stringify(cart)
+                };
+
+                const formData = new FormData();
+                for (const key in orderData) {
+                    formData.append(key, orderData[key]);
+                }
+
+                try {
+                    const res = await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: formData });
+                    if (!res.ok) throw new Error('Network response was not ok.');
+                    const result = await res.json();
+                    if (result.result === 'success') {
+                        const { totalPembayaran, pesanan, jumlah } = result.data;
+                        const waMsg = `Halo Adhyani's Kitchen, saya mau konfirmasi pesanan:\n\n*ID Pesanan:* ${orderId}\n*Nama:* ${customerName}\n\n*Pesanan:*\n${pesanan.split(', ').map(p => `- ${p}`).join('\n')}\n\n*Total:* ${formatRupiah(totalPembayaran)}\n\nSaya akan segera melakukan pembayaran. Terima kasih!`;
+                        window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(waMsg)}`, '_blank');
+                        cart = {};
+                        customerNameInput.value = '';
+                        customerEmailInput.value = '';
+                        customerWhatsappInput.value = ''; 
+                        updateUI();
+                        document.querySelectorAll('[id^="quantity-"]').forEach(el => el.textContent = '0');
+                        cartModal.classList.remove('show');
+                    } else throw new Error(result.message || 'Unknown error from server');
+                } catch (error) {
+                    alert(`Gagal mengirim pesanan: ${error.message}`);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            const setLoading = (isLoading) => {
+                document.getElementById('submit-text').classList.toggle('hidden', isLoading);
+                document.getElementById('submit-loading').classList.toggle('hidden', !isLoading);
+                submitOrderBtn.disabled = isLoading;
+            };
+
+            productListEl.addEventListener('click', e => {
+                const target = e.target.closest('button');
+                if (!target) return;
+                const { id } = target.dataset;
+                if (target.matches('.quantity-change')) {
+                    const quantityEl = document.getElementById(`quantity-${id}`);
+                    let qty = parseInt(quantityEl.textContent) + parseInt(target.dataset.change);
+                    quantityEl.textContent = Math.max(0, qty);
+                } else if (target.matches('.add-to-cart-btn')) {
+                    const quantityEl = document.getElementById(`quantity-${id}`);
+                    const qty = parseInt(quantityEl.textContent);
+                    if (qty > 0) {
+                        cart[id] = (cart[id] || 0) + qty;
+                        quantityEl.textContent = '0';
+                        updateUI();
+                    }
+                }
+            });
+            
+            cartItemsContainer.addEventListener('click', e => {
+                const target = e.target.closest('button');
+                if (!target) return;
+                const { id } = target.dataset;
+
+                if (target.matches('.cart-quantity-change')) {
+                    const change = parseInt(target.dataset.change);
+                    if (cart[id]) {
+                        cart[id] += change;
+                        if (cart[id] <= 0) {
+                            delete cart[id];
+                        }
+                    }
+                } else if (target.matches('.cart-item-remove')) {
+                    delete cart[id];
+                }
+                updateUI();
+            });
+
+            filterContainer.addEventListener('click', e => {
+                if (e.target.matches('.btn-filter')) {
+                    document.querySelector('.btn-filter.active').classList.remove('active');
+                    e.target.classList.add('active');
+                    renderProducts(e.target.dataset.filter);
+                }
+            });
+            
+            const observer = new IntersectionObserver((entries) => entries.forEach(entry => entry.isIntersecting && entry.target.classList.add('visible')), { threshold: 0.1 });
+            document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+
+            cartButton.addEventListener('click', () => { updateCartModal(); cartModal.classList.add('show'); });
+            closeModalBtn.addEventListener('click', () => cartModal.classList.remove('show'));
+            cartModal.addEventListener('click', e => e.target === cartModal && cartModal.classList.remove('show'));
+            mobileMenuButton.addEventListener('click', () => mobileMenu.classList.toggle('hidden'));
+            document.querySelectorAll('#mobile-menu a').forEach(link => link.addEventListener('click', () => mobileMenu.classList.add('hidden')));
+            submitOrderBtn.addEventListener('click', submitOrder);
+
+            fetchProducts();
+        });
+    </script>
+</body>
+</html>
