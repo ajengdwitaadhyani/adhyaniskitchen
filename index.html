@@ -221,8 +221,10 @@
             };
  
             const fetchProducts = async () => {
-                // [PERBAIKAN] Menambahkan pengecekan jika URL belum diganti
-                if (GOOGLE_SCRIPT_URL === 'https://script.google.com/macros/s/AKfycbwyJZe7mowmXAytgWutnwZfgGfYgNixJQ2Vu8lcONxb4_6TJJpdRrJpB2t6SVxVSONeWg/exec') {
+                // [PERBAIKAN] Pengecekan diubah agar tidak ikut diganti oleh script deployment.
+                // Logika ini memeriksa apakah URL BUKAN URL http/https yang valid.
+                // Jika ya, berarti placeholder belum diganti dan proses build gagal.
+                if (!GOOGLE_SCRIPT_URL.startsWith('http')) {
                     console.error("GOOGLE_SCRIPT_URL is not set. Make sure it's replaced during the build process.");
                     productListEl.innerHTML = `<p class="text-center text-red-500 col-span-full">Konfigurasi URL backend belum diatur. Proses build/deployment mungkin gagal.</p>`;
                     productListLoader.style.display = 'none';
