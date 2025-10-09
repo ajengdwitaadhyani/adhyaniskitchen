@@ -16,6 +16,17 @@ jobs:
       - name: Checkout 🛎️
         uses: actions/checkout@v3
 
+      # [LANGKAH DEBUGGING] Memeriksa apakah Secret sudah diatur
+      - name: Verify Secret Availability
+        run: |
+          if [ -z "${{ secrets.GOOGLE_SCRIPT_URL }}" ]; then
+            echo "Error: Rahasia GOOGLE_SCRIPT_URL tidak ditemukan atau kosong."
+            echo "Pastikan Anda sudah mengaturnya di Settings > Secrets and variables > Actions."
+            exit 1
+          else
+            echo "Secret GOOGLE_SCRIPT_URL berhasil ditemukan."
+          fi
+
       - name: Replace Google Script URL 🔄
         run: |
           sed -i "s|__GOOGLE_SCRIPT_URL__|${{ secrets.GOOGLE_SCRIPT_URL }}|g" index.html
