@@ -77,46 +77,50 @@ Langkah ini hanya perlu dilakukan satu kali untuk menyiapkan API endpoint Anda.
 const sheetPesanan = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Pesanan Masuk");
 const sheetProduk = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Daftar Produk");
 
-// [PERBAIKAN BARU] Fungsi untuk mengambil ID file dari URL Google Drive
-function getFileIdFromUrl(url) {
-  if (typeof url !== 'string' || url === '') return null;
-  const regex = /drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/;
-  const match = url.match(regex);
-  return match ? match[1] : null;
+/**
+ * Mengubah berbagai jenis URL gambar menjadi URL gambar langsung (direct link).
+ * Tidak lagi menggunakan konversi Base64.
+ * @param {string} url - URL gambar dari Google Sheet.
+ * @returns {string} URL gambar yang bisa langsung ditampilkan di <img>.
+ */
+function getDirectImageUrl(url) {
+  if (typeof url !== 'string' || url === '') return "[https://placehold.co/600x400/CCCCCC/FFFFFF?text=Invalid+URL](https://placehold.co/600x400/CCCCCC/FFFFFF?text=Invalid+URL)";
+
+  // 1. Menangani link halaman Imgur (contoh: [https://imgur.com/abcdef](https://imgur.com/abcdef))
+  const imgurMatch = url.match(/imgur\.com\/([a-zA-Z0-9]+)$/);
+  if (imgurMatch && imgurMatch[1]) {
+    return `https://i.imgur.com/${imgurMatch[1]}.jpg`;
+  }
+
+  // 2. Menangani link Google Drive
+  const driveMatch = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (driveMatch && driveMatch[1]) {
+    return `https://drive.google.com/uc?export=view&id=${driveMatch[1]}`;
+  }
+
+  // 3. Jika sudah merupakan link gambar langsung, kembalikan apa adanya.
+  if (url.match(/\.(jpeg|jpg|gif|png)$/) != null) {
+    return url;
+  }
+
+  // Fallback jika format tidak dikenali
+  return url;
 }
 
-// [PERBAIKAN BARU] Fungsi untuk membaca gambar dan mengubahnya menjadi Base64
-function getImageAsBase64(url) {
-  const fileId = getFileIdFromUrl(url);
-  if (!fileId) {
-    return url; // Kembalikan URL asli jika bukan link GDrive atau jika ID tidak ditemukan
-  }
-  try {
-    const file = DriveApp.getFileById(fileId);
-    const blob = file.getBlob();
-    const contentType = blob.getContentType();
-    const base64Data = Utilities.base64Encode(blob.getBytes());
-    return `data:${contentType};base64,${base64Data}`;
-  } catch (e) {
-    Logger.log("Gagal mengonversi gambar: " + e.toString());
-    return "https://placehold.co/600x400/CCCCCC/FFFFFF?text=Gagal+Muat"; // URL gambar placeholder jika error
-  }
-}
 
 function doGet(e) {
   try {
     const productsData = sheetProduk.getDataRange().getValues();
-    const headers = productsData.shift();
+    const headers = productsData.shift(); // Ambil header
     
-    // Temukan indeks kolom imageUrl
     const imageUrlIndex = headers.indexOf('imageUrl');
 
     const productsJson = productsData.map(row => {
       let product = {};
       headers.forEach((header, index) => {
-        // [PERBAIKAN BARU] Jika kolomnya adalah imageUrl, konversi ke Base64
+        // Jika kolomnya adalah imageUrl, proses dengan fungsi baru
         if (index === imageUrlIndex) {
-          product[header] = getImageAsBase64(row[index]);
+          product[header] = getDirectImageUrl(row[index]);
         } else {
           product[header] = row[index];
         }
